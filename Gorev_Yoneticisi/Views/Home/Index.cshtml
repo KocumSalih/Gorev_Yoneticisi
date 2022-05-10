@@ -1,0 +1,344 @@
+﻿
+@{
+    ViewData["Title"] = "Home Page";
+}
+@section head{
+    <link href="~/css/Calendar/main.css" rel="stylesheet" />
+    <link href="~/css/jquery.datetimepicker.css" rel="stylesheet" />
+    <link href="~/css/sidebars.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" />
+}
+<div class="text-center">
+    <h3 class="display-4"><i class="fa-solid fa-earth-asia"></i>   Hadi Planlayalım   <i class="fa-solid fa-earth-europe"></i></h3>
+    <hr class="my-4">
+</div>
+
+<div class="row" id="wrap">
+    @*Takvim*@
+    <div class="col-md-12 order-md-2" id="calendar-wrap">
+        <div id="calendar"></div>
+    </div>
+</div>
+
+@*Kaydetme*@
+<div class="modal fade" id="myModalSave" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Görev Kayıt Ekranı</h5>
+            </div>
+            <div class="modal-body">
+                <div class="modal-body">
+                    <form>
+                        <div class="form-group">
+                            <label for="txtSubject">Görev Başlığı</label>
+                            <input type="text" id="txtSubject" class="form-control rounded-4 my-2">
+                        </div>
+                        <div class="form-group">
+                            <label>Start</label>
+                            <div class="input-group">
+                                <input type="text" id="txtStart" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>End</label>
+                            <div class="input-group">
+                                <input type="text" id="txtEnd" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="txtDescription">Görev İçeriği</label>
+                            <textarea class="form-control" id="txtDescription" rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Theme Color</label>
+                            <select id="ddThemeColor" class="form-control">
+                                <option value="">Default</option>
+                                <option value="red">Red</option>
+                                <option value="blue">Blue</option>
+                                <option value="black">Black</option>
+                                <option value="green">Green</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+                    <button type="button" id="btnSave" class="btn btn-primary">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@*silme ve düzenleme*@
+
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><span id="eventTitle"></span></h5>
+            </div>
+            <div class="modal-body">
+                <div class="modal-body">
+                    <p id="pDetails"></p>
+                </div>
+                <div class="modal-footer">
+                    <button id="btnDelete" class="btn btn-secondary btn-sm">Sil</button>
+                    <button id="btnEdit" class="btn btn-secondary btn-sm" style="margin-right:5px;">Düzenle</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Kapat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+@section script{
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.18.1/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.0/locales/tr.min.js"></script>
+    <script src="~/js/Calendar/main.js"></script>
+    <script src="~/js/sidebars.js"></script>
+    <script src="~/js/jquery.datetimepicker.full.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            class myEvent {
+                constructor(eventId, eventTitle, description, start, end, textcolor, initView, activeStartx) {
+                    this.EventId = eventId;
+                    this.Title = eventTitle;
+                    this.Description = description;
+                    this.Start = start;
+                    this.End = end;
+                    this.Color = textcolor;
+                    this.View = initView;
+                    this.Date = activeStartx;
+                }
+            }
+            var events = [];
+            var initialView = 'dayGridMonth';
+            var calendar = null;
+            var selectedEvent = null;
+            var activeStart = null;
+
+
+            FetchEventAndRenderCalendar();
+            SetDateTimePicker();
+            function FetchEventAndRenderCalendar() {
+                events = [];
+                $.ajax({
+                    type: "GET",
+                    url: "/Home/GetEvents",
+                    success: function (data) {
+                        $.each(data, function (i, v) {
+                            events.push({
+                                eventID: v.eventId,
+                                title: v.title,
+                                description: v.description,
+                                start: moment(v.start),
+                                end: v.end != null ? moment(v.end) : null,
+                                textColor: v.color,
+                                allDay: v.IsFullDay
+                            });
+                        })
+                        GenerateCalender(events);
+                    },
+                    error: function (error) {
+                        alert('failed');
+                    }
+                })
+            }
+
+            function SetDateTimePicker() {
+                jQuery('#txtStart, #search-from-date, #search-to-date').datetimepicker(
+                    {
+                        format: 'd/m/y H:i A',
+                    })
+                jQuery('#txtEnd, #search-from-date, #search-to-date').datetimepicker({
+                    format: 'd/m/y H:i A',
+                })
+            }
+
+            function GenerateCalender(myEvents) {
+                var calendarEl = document.getElementById('calendar');
+                var initialLocaleCode = 'tr';
+                calendar = new FullCalendar.Calendar(calendarEl, {
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                    },
+                    initialView: initialView,
+                    initialDate: activeStart,
+                    locale: initialLocaleCode,
+                    dayMaxEvents: true,
+                    events: "/Home/GetEvents",
+                    eventClick: function (info) {
+                        activeStart = moment(info.event.startStr).format("YYYY-MM-DD");
+                        initialView = info.view.type;
+
+                        selectedEvent = new myEvent(info.event._def.extendedProps.eventId, info.event.title, info.event._def.extendedProps.description, moment(info.event.start).format("DD-MMM-YYYY HH:mm a"), moment(info.event.end).format("DD-MMM-YYYY HH:mm a"), info.event._def.ui.backgroundColor);
+
+                        $('#eventTitle').text(info.event.title);
+                        var $description = $('<div/>');
+                        $description.append($('<p/>').html('<b>Start:</b>' + moment(info.event.start).format("DD-MMM-YYYY HH:mm a")));
+                        if (info.event.end != null) {
+                            $description.append($('<p/>').html('<b>End:</b>' + moment(info.event.end).format("DD-MMM-YYYY HH:mm a")));
+                        }
+                        $description.append($('<p/>').html('<b>Description:</b>' + info.event._def.extendedProps.description));
+                        $('#myModal #pDetails').empty().html($description);
+
+                        $('#myModal').modal('show');
+                    },
+                    selectable: true,
+                    select: function (selectInfo) {
+                        activeStart = selectInfo.startStr;
+                        initialView = selectInfo.view.type;
+
+                        var time = selectInfo.start;
+                        selectedEvent = new myEvent(0, '', '', selectInfo.start, moment(time).add(1, 'hour'), '');
+                        openAddEditForm();
+                    },
+                    editable: true,
+                    eventDrop: function (eventDropInfo) {
+                        activeStart = moment(eventDropInfo.event.startStr).format("YYYY-MM-DD");
+                        initialView = eventDropInfo.view.type;
+
+                        var droppedEvent = eventDropInfo.event;
+                        var data = {
+                            EventID: droppedEvent._def.extendedProps.eventId,
+                            Title: droppedEvent.title,
+                            Start: moment(droppedEvent.start).format('DD/MM/YYYY HH:mm A'),
+                            End: droppedEvent.end != null ? moment(droppedEvent.end).format('DD/MM/YYYY HH:mm A') : null,
+                            Description: droppedEvent._def.extendedProps.description,
+                            Color: droppedEvent._def.ui.backgroundColor,
+                            View: initialView,
+                            Date: activeStart,
+                        };
+                        SaveEvent(data);
+                    },
+                    eventResize: function (info) {
+                        activeStart = moment(info.event.startStr).format("YYYY-MM-DD");
+                        initialView = info.view.type;
+
+                        var a = info.event;
+                        var data = {
+                            EventID: a._def.extendedProps.eventId,
+                            Title: a.title,
+                            Start: moment(a.start).format('DD/MM/YYYY HH:mm A'),
+                            End: a.end != null ? moment(a.end).format('DD/MM/YYYY HH:mm A') : null,
+                            Description: a._def.extendedProps.description,
+                            Color: a._def.ui.backgroundColor,
+                            View: initialView,
+                            Date: activeStart,
+                        };
+                        SaveEvent(data);
+                    },
+                })
+                calendar.render();
+                calendar.setOption('locale', 'tr');
+            }
+
+            $('#btnSave').click(function () {
+                if ($('#txtSubject').val().trim() == "") {
+                    alert('Başlığı girmeniz lazım.');
+                    return;
+                }
+                if ($('#txtStart').val().trim() == "") {
+                    alert('Başlangıç tarihini seçmeniz gerekmekte.');
+                    return;
+                }
+                if ($('#txtEnd').val().trim() == "") {
+                    alert('Bitiş tarihini seçmeniz gerekmekte.');
+                    return;
+                }
+                else {
+                    var startDate = moment($('#txtStart').val(), "DD/MM/YYYY HH:mm A").toDate();
+                    var endDate = moment($('#txtEnd').val(), "DD/MM/YYYY HH:mm A").toDate();
+                    if (startDate > endDate) {
+                        alert('Giriş tarihi bitiş tarihinden önce olmalıdır.');
+                        return;
+                    }
+                }
+
+                var title = $('#txtSubject').val().trim();
+                var start = $('#txtStart').val().trim();
+                var end = $('#chkIsFullDay').is(':checked') ? null : $('#txtEnd').val().trim();
+                var description = $('#txtDescription').val();
+                var color = $('#ddThemeColor').val();
+
+                if (selectedEvent.EventId == 0) {
+                    var data = {
+                        EventID: 0,
+                        Title: title,
+                        Start: start,
+                        End: end,
+                        Description: description,
+                        Color: color,
+                        View: initialView,
+                        Date: activeStart,
+                    }
+                    SaveEvent(data);
+                } else {
+                    var item = new myEvent(selectedEvent.EventId, title, description, start, end, color, initialView, activeStart);
+                    SaveEvent(item);
+                }
+            })
+
+            $('#btnEdit').click(function () {
+                openAddEditForm();
+            })
+            $('#btnDelete').click(function () {
+                if (selectedEvent != null && confirm('Görevi silmek istediğinize eminmisiniz?')) {
+                    var idViewDate = { id: selectedEvent.EventId, View: initialView, Date: activeStart };
+                    $.ajax({
+                        type: "POST",
+                        url: '/Home/DeleteEvent',
+                        data: idViewDate,
+                        success: function (data) {
+                            if (data.isOk) {
+                                $('#myModal').modal('hide');
+                                initialView = data.view;
+                                activeStart = data.date;
+                                FetchEventAndRenderCalendar();
+                            }
+                        },
+                        error: function () {
+                            alert('Silme işlemi yapılamadı!');
+                        }
+                    })
+                }
+            })
+            function openAddEditForm() {
+                if (selectedEvent != null) {
+                    $('#hdEventID').val(selectedEvent.EventId);
+                    $('#txtSubject').val(selectedEvent.Title);
+                    $('#txtStart').val(moment(selectedEvent.Start).format('DD/MM/YYYY HH:mm A'));
+                    $('#txtEnd').val(selectedEvent.End != null ? moment(selectedEvent.End).format('DD/MM/YYYY HH:mm A') : '');
+                    $('#txtDescription').val(selectedEvent.Description);
+                    $('#ddThemeColor').val(selectedEvent.Color);
+                }
+                $('#myModal').modal('hide');
+                $('#myModalSave').modal('show');
+            }
+            function SaveEvent(mydata) {
+                $.ajax({
+                    type: "POST",
+                    url: '/Home/SaveEvent',
+                    data: mydata,
+                    success: function (data) {
+                        if (data.isOk) {
+                            //Refresh the calender
+                            initialView = data.view;
+                            activeStart = data.date;
+                            $('#myModalSave').modal('hide');
+                            FetchEventAndRenderCalendar();
+                        }
+                    },
+                    error: function () {
+                        alert('Failed');
+                    }
+                })
+            }
+        })
+    </script>
+}
